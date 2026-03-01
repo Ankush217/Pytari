@@ -803,7 +803,8 @@ class Opcodes:
         No vectors, no stack push, just halt
         """
         cpu.cycles += 6
-        cpu.PC = (cpu.PC + 1) & 0xFFFF  # absorb it
+        cpu.halted = True
+        
 
     def lda_absx(self, cpu):
         """

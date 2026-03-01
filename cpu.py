@@ -252,13 +252,11 @@ class CPU6507:
         self.PC = (self.PC + 1) & 0xFFFF
         self.cycles += 1
         return value
-
     def step(self):
-        """
-        Execute one instruction.
-        """
         if self.halted:
             return
+
+        cycles_before = self.cycles
 
         opcode_pc = self.PC
         opcode = self.fetch_byte()
@@ -270,3 +268,9 @@ class CPU6507:
             )
 
         handler(self)
+
+        cycles_used = self.cycles - cycles_before
+
+        # ---- Synchronize TIA ----
+        for _ in range(cycles_used * 3):
+            self.bus.tia.tick()

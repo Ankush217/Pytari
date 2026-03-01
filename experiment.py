@@ -1,11 +1,12 @@
 from cpu import CPU6507
-from bus import Atari2600Bus, TIA, RIOT, Cartridge
+from bus import Atari2600Bus, RIOT, Cartridge
 from pathlib import Path
-
+from tia import TIA
 
 ROM_PATH = Path("PM.a26")
 LOG_PATH = Path("Output.log")
 cyc = 100000
+
 
 def load_rom(path: Path) -> bytes:
     if not path.exists():
@@ -17,9 +18,9 @@ def load_rom(path: Path) -> bytes:
 
 
 def main():
-    # --- CLEAR / CREATE LOG FIRST THING ---
+    # Clear log
     with open(LOG_PATH, "w") as log:
-        log.write("")  # truncate file
+        log.write("")
 
     def log_print(*args):
         with open(LOG_PATH, "a") as log:
@@ -33,20 +34,17 @@ def main():
     bus = Atari2600Bus(cart, tia, riot)
     cpu = CPU6507(bus)
 
-    # Wrap bus.write to trace stack operations
+    # --- Optional: stack tracing ---
     original_write = bus.write
     def traced_write(address, value):
-        # Check if writing to stack area (0x0100-0x01FF)
         if 0x0100 <= (address & 0x1FFF) <= 0x01FF:
             log_print(f"  *** STACK WRITE: addr=0x{address:04X} value=0x{value:02X} SP=0x{cpu.SP:02X}")
         original_write(address, value)
     bus.write = traced_write
 
-    # Wrap bus.read to trace stack reads
     original_read = bus.read
     def traced_read(address):
         value = original_read(address)
-        # Check if reading from stack area
         if 0x0100 <= (address & 0x1FFF) <= 0x01FF:
             log_print(f"  *** STACK READ:  addr=0x{address:04X} value=0x{value:02X} SP=0x{cpu.SP:02X}")
         return value
@@ -54,32 +52,23 @@ def main():
 
     cpu.reset()
 
-    log_print("=== A26 DEBUG EXPERIMENT ===")
+    log_print("=== A26 + TIA DEBUG EXPERIMENT ===")
     log_print(f"ROM: {ROM_PATH}")
     log_print(f"Reset PC: {cpu.PC:04X}")
     log_print("")
 
     for step in range(cyc):
+
         if cpu.halted:
             log_print("CPU HALTED (BRK)")
             break
 
         pc_before = cpu.PC
-        opcode = original_read(cpu.PC)  # Use original to avoid logging this peek
+        opcode = original_read(cpu.PC)
 
-        # Special logging for JSR and RTS
-        if opcode == 0x20:  # JSR
-            log_print(f"\n>>> JSR at PC={pc_before:04X}, SP before=0x{cpu.SP:02X}")
-        elif opcode == 0x60:  # RTS
-            log_print(f"\n>>> RTS at PC={pc_before:04X}, SP before=0x{cpu.SP:02X}")
+        cpu.step()   # This now advances TIA automatically
 
-        cpu.step()
-
-        if opcode == 0x20:  # JSR
-            log_print(f"<<< JSR done: jumped to PC={cpu.PC:04X}, SP after=0x{cpu.SP:02X}\n")
-        elif opcode == 0x60:  # RTS
-            log_print(f"<<< RTS done: returned to PC={cpu.PC:04X}, SP after=0x{cpu.SP:02X}\n")
-
+        # Log instruction
         log_print(f"[{step}] PC={pc_before:04X} OPCODE={opcode:02X}")
         log_print(
             f"    A={cpu.A:02X} "
@@ -90,6 +79,21 @@ def main():
             f"PC={cpu.PC:04X} "
             f"CYC={cpu.cycles}"
         )
+
+        # --- TIA state snapshot ---
+        log_print(
+            f"    TIA: frame={tia.frame} "
+            f"scanline={tia.scanline} "
+            f"color_clock={tia.color_clock} "
+            f"VSYNC={int(tia.vsync)} "
+            f"VBLANK={int(tia.vblank)}"
+        )
+
+        # --- Frame boundary detection ---
+        if tia.frame_ready:
+            log_print(f"\n=== FRAME {tia.frame} COMPLETE ===\n")
+            tia.consume_frame()
+
         log_print("")
 
 

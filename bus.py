@@ -58,12 +58,7 @@ class Atari2600Bus(Bus):
         self.tia.write(address & 0x003F, value)
 
 
-class TIA:
-    def read(self, address: int) -> int:
-        return None  # unmapped → open bus
 
-    def write(self, address: int, value: int) -> None:
-        pass
 
 
 class RIOT:
