@@ -1,3 +1,4 @@
+# bus.py
 class Bus:
     def read(self, address: int) -> int:
         raise NotImplementedError
@@ -68,31 +69,15 @@ class TIA:
 class RIOT:
     def __init__(self):
         self.ram = bytearray(128)
-        self.io = bytearray(32)
 
     def read(self, address: int) -> int:
-        address &= 0x7F
-
-        # RAM: A5 = 0
-        if (address & 0x20) == 0:
-            return self.ram[address & 0x1F]
-
-        # I/O: A6 = 0
-        if (address & 0x40) == 0:
-            return self.io[address & 0x1F]
-
-        return None
+        # The bus has already masked the RIOT address down to 7 bits.
+        # Use the full 0x00-0x7F range so all 128 bytes are addressable.
+        return self.ram[address & 0x7F]
 
     def write(self, address: int, value: int) -> None:
-        address &= 0x7F
-
-        if (address & 0x20) == 0:
-            self.ram[address & 0x1F] = value
-            return
-
-        if (address & 0x40) == 0:
-            self.io[address & 0x1F] = value
-            return
+        # Store directly into the 128-byte RAM window.
+        self.ram[address & 0x7F] = value & 0xFF
 
 
 class Cartridge:

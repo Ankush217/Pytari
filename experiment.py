@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROM_PATH = Path("PM.a26")
 LOG_PATH = Path("Output.log")
-
+cyc = 100000
 
 def load_rom(path: Path) -> bytes:
     if not path.exists():
@@ -59,7 +59,7 @@ def main():
     log_print(f"Reset PC: {cpu.PC:04X}")
     log_print("")
 
-    for step in range(1000):
+    for step in range(cyc):
         if cpu.halted:
             log_print("CPU HALTED (BRK)")
             break
